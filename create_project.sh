@@ -25,6 +25,35 @@ render_template() {
         "$template_file" > "$output_file"
 }
 
+validate_project_name() {
+    local name=$1
+
+    if [[ -z "$name" ]]; then
+        echo -e "\n❌ 项目名称不能为空！"
+        exit 1
+    fi
+
+    if ! [[ "$name" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+        echo "❌ 项目名称只能包含小写字母、数字、中划线和下划线，并且必须以小写字母或数字开头"
+        exit 1
+    fi
+}
+
+validate_port() {
+    local port=$1
+    local label=$2
+
+    if ! [[ "$port" =~ ^[0-9]+$ ]]; then
+        echo "❌ $label 端口必须是数字"
+        exit 1
+    fi
+
+    if (( port < 1 || port > 65535 )); then
+        echo "❌ $label 端口必须在 1-65535 之间"
+        exit 1
+    fi
+}
+
 clear
 echo "=================================================="
 echo "          Simon Docker项目自动化创建工具        "
@@ -32,10 +61,7 @@ echo "=================================================="
 
 # 1. 输入项目名称
 read -p "👉 请输入项目名称：" PROJECT_NAME
-if [[ -z "$PROJECT_NAME" ]]; then
-    echo -e "\n❌ 项目名称不能为空！"
-    exit 1
-fi
+validate_project_name "$PROJECT_NAME"
 
 # 2. 选择模块
 echo -e "\n请选择需要的服务："
@@ -59,12 +85,12 @@ esac
 # 3. 输入端口
 if [[ $HAS_API -eq 1 ]]; then
     read -p "👉 请输入 API 运行端口：" API_PORT
-    if ! [[ "$API_PORT" =~ ^[0-9]+$ ]]; then echo "❌ 端口必须是数字"; exit 1; fi
+    validate_port "$API_PORT" "API"
 fi
 
 if [[ $HAS_WEB -eq 1 ]]; then
     read -p "👉 请输入 Web 外部端口：" WEB_HOST_PORT
-    if ! [[ "$WEB_HOST_PORT" =~ ^[0-9]+$ ]]; then echo "❌ 端口必须是数字"; exit 1; fi
+    validate_port "$WEB_HOST_PORT" "Web"
 fi
 
 # 4. 定义目录结构

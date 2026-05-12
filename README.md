@@ -2,7 +2,7 @@
 
 这是一个用于快速创建 Docker 部署目录和部署脚本的小工具。
 
-你只需要运行 `create_project.sh`，按提示输入项目名称、选择需要的服务、填写端口，脚本就会自动在 `/apps` 目录下创建项目结构，并生成对应的部署脚本。
+你可以交互式运行 `create_project.sh`，也可以通过命令行参数直接创建项目。脚本默认在 `/apps` 目录下创建项目结构，并生成对应的部署脚本；也可以通过 `BASE_DIR` 环境变量或 `--base-dir` 参数修改根目录。
 
 ## 这个工具能做什么
 
@@ -10,9 +10,11 @@
 - 根据选择生成 API 部署脚本、Web 部署脚本，或两个都生成
 - 自动创建日志目录
 - 部署时自动停止并删除旧容器
-- 解压新的项目包
+- 部署前校验压缩包和 Docker 构建文件
+- 先解压到临时目录，构建成功后再替换服务目录
 - 重新构建 Docker 镜像
 - 启动新的 Docker 容器
+- 支持交互输入和命令行参数两种创建方式
 
 ## 目录说明
 
@@ -46,13 +48,19 @@
 - Docker
 - tar
 
-同时要确保当前用户有权限写入 `/apps` 目录，并且有权限执行 Docker 命令。
+同时要确保当前用户有权限写入项目根目录，并且有权限执行 Docker 命令。
 
 如果 `/apps` 不存在或没有权限，可以先创建并授权：
 
 ```bash
 sudo mkdir -p /apps
 sudo chown -R $USER /apps
+```
+
+如果不想使用 `/apps`，可以指定其他绝对路径：
+
+```bash
+BASE_DIR=/data/apps bash create_project.sh
 ```
 
 ## 如何创建项目
@@ -96,6 +104,33 @@ bash create_project.sh
 
 ```text
 /apps/demo
+```
+
+也可以使用非交互模式：
+
+```bash
+bash create_project.sh --name demo --type all --api-port 8080 --web-port 8081
+```
+
+常用参数：
+
+```text
+--name <项目名>          项目名称
+--type <api|web|all>     服务类型
+--api-port <端口>        API 服务端口
+--web-port <端口>        Web 外部端口
+--base-dir <目录>        项目根目录，默认 /apps
+```
+
+示例：创建到 `/data/apps/demo`
+
+```bash
+bash create_project.sh \
+  --name demo \
+  --type all \
+  --api-port 8080 \
+  --web-port 8081 \
+  --base-dir /data/apps
 ```
 
 ## 如何部署 API
@@ -198,13 +233,15 @@ docker logs demo-web
 ## 注意事项
 
 - 项目名称不能为空。
-- 端口必须填写数字。
+- 项目名称只能包含小写字母、数字、中划线和下划线，并且必须以小写字母或数字开头。
+- 端口必须是 `1-65535` 之间的数字。
 - 如果端口已经被占用，容器会启动失败。
-- 每次部署都会清空 `/apps/项目名称/api` 或 `/apps/项目名称/web` 目录里的旧文件。
+- 部署脚本会先解压到临时目录并完成镜像构建，成功后才替换 `/apps/项目名称/api` 或 `/apps/项目名称/web` 目录。
 - 不要把需要长期保存的重要文件直接放在 `api/` 或 `web/` 目录下。
 - API 压缩包必须命名为 `app.tar.gz`。
+- API 压缩包根目录必须包含 `Dockerfile`。
 - Web 压缩包必须命名为 `web.tar.gz`。
-- Web 压缩包里必须有 `dist/` 目录，否则部署会失败。
+- Web 压缩包根目录必须包含 `dist/` 目录和 `Docker/Dockerfile`。
 
 ## 常用命令
 

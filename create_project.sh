@@ -1,6 +1,30 @@
 #!/bin/bash
 set -euo pipefail
 
+SCRIPT_SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+escape_sed_replacement() {
+    printf '%s' "$1" | sed 's/[&|\]/\\&/g'
+}
+
+render_template() {
+    local template_file=$1
+    local output_file=$2
+    local project_name
+    local api_port
+    local web_host_port
+
+    project_name=$(escape_sed_replacement "$PROJECT_NAME")
+    api_port=$(escape_sed_replacement "$API_PORT")
+    web_host_port=$(escape_sed_replacement "$WEB_HOST_PORT")
+
+    sed \
+        -e "s|\[\[PROJECT_NAME\]\]|$project_name|g" \
+        -e "s|\[\[API_PORT\]\]|$api_port|g" \
+        -e "s|\[\[WEB_HOST_PORT\]\]|$web_host_port|g" \
+        "$template_file" > "$output_file"
+}
+
 clear
 echo "=================================================="
 echo "          Simon Docker项目自动化创建工具        "
@@ -59,57 +83,7 @@ echo "✅ 目录创建完成：$PROJECT_DIR"
 # 生成 deploy_api.sh
 # ==============================
 if [[ $HAS_API -eq 1 ]]; then
-cat > "$SCRIPT_DIR/deploy_api.sh" << EOF
-#!/bin/bash
-APP_NAME="$PROJECT_NAME"
-APP_PORT=$API_PORT
-HOST_PORT=\$APP_PORT
-
-CONTAINER_NAME="\${APP_NAME}-api"
-DOCKER_IMAGE="\$CONTAINER_NAME"
-
-BASE_DIR="/apps/"
-HOME_DIR="\$BASE_DIR\$APP_NAME"
-APP_DIR="\$HOME_DIR/api"
-LOG_DIR="\$HOME_DIR/logs"
-
-mkdir -p "\$APP_DIR" "\$LOG_DIR"
-LOG_FILE="\$LOG_DIR/deployment_api_log.txt"
-
-echo "============================================" >> "\$LOG_FILE"
-echo "Deployment API Start | \$(date)" >> "\$LOG_FILE"
-
-# 停止旧容器
-if docker ps -a --format '{{.Names}}' | grep -Fxq "\$CONTAINER_NAME"; then
-  if docker ps -q --filter "name=\$CONTAINER_NAME" | grep -q .; then
-    docker stop "\$CONTAINER_NAME"
-  fi
-  docker rm "\$CONTAINER_NAME"
-fi
-
-# 清理旧文件
-rm -rf "\${APP_DIR:?}"/*
-
-# 移动并解压
-cp "\$HOME_DIR/app.tar.gz" "\$APP_DIR/"
-cd "\$APP_DIR" || exit 1
-tar -xzf app.tar.gz
-rm -f app.tar.gz
-
-# 构建镜像
-docker build -t "\$DOCKER_IMAGE" .
-
-# 启动容器
-docker run -d \\
-  -p "\$HOST_PORT":"\$APP_PORT" \\
-  -v "\$LOG_DIR:/logs" \\
-  --restart always \\
-  --name "\$CONTAINER_NAME" \\
-  "\$DOCKER_IMAGE"
-
-echo "✅ API 部署完成！" >> "\$LOG_FILE"
-EOF
-
+render_template "$SCRIPT_SOURCE_DIR/api_template.sh" "$SCRIPT_DIR/deploy_api.sh"
 chmod +x "$SCRIPT_DIR/deploy_api.sh"
 echo "✅ 生成 API 部署脚本：$SCRIPT_DIR/deploy_api.sh"
 fi
@@ -118,66 +92,7 @@ fi
 # 生成 deploy_web.sh
 # ==============================
 if [[ $HAS_WEB -eq 1 ]]; then
-cat > "$SCRIPT_DIR/deploy_web.sh" << EOF
-#!/bin/bash
-APP_NAME="$PROJECT_NAME"
-APP_PORT=80
-HOST_PORT="$WEB_HOST_PORT"
-
-CONTAINER_NAME="\${APP_NAME}-web"
-DOCKER_IMAGE="\$CONTAINER_NAME"
-
-BASE_DIR="/apps/"
-HOME_DIR="\$BASE_DIR\$APP_NAME"
-APP_DIR="\$HOME_DIR/web"
-LOG_DIR="\$HOME_DIR/logs"
-
-mkdir -p "\$APP_DIR" "\$LOG_DIR"
-LOG_FILE="\$LOG_DIR/deployment_web_log.txt"
-
-echo "============================================" >> "\$LOG_FILE"
-echo "Deployment Web Start | \$(date)" >> "\$LOG_FILE"
-
-# 停止旧容器
-if docker ps -a --format '{{.Names}}' | grep -Fxq "\$CONTAINER_NAME"; then
-  if docker ps -q --filter "name=\$CONTAINER_NAME" | grep -q .; then
-    docker stop "\$CONTAINER_NAME"
-  fi
-  docker rm "\$CONTAINER_NAME"
-fi
-
-# 清理
-rm -rf "\${APP_DIR:?}"/*
-
-# 移动解压
-cp "\$HOME_DIR/web.tar.gz" "\$APP_DIR/"
-cd "\$APP_DIR" || exit 1
-tar -xzf web.tar.gz
-rm -f web.tar.gz
-
-# 移动 dist
-if [ -d "dist" ]; then
-  mv dist Docker/
-else
-  echo "❌ dist 不存在" >> "\$LOG_FILE"
-  exit 1
-fi
-
-# 构建
-cd Docker || exit 1
-docker build -t "\$DOCKER_IMAGE" .
-
-# 启动
-docker run -d \\
-  -p "\$HOST_PORT":"\$APP_PORT" \\
-  -v "\$LOG_DIR:/logs" \\
-  --restart always \\
-  --name "\$CONTAINER_NAME" \\
-  "\$DOCKER_IMAGE"
-
-echo "✅ Web 部署完成！" >> "\$LOG_FILE"
-EOF
-
+render_template "$SCRIPT_SOURCE_DIR/web_template.sh" "$SCRIPT_DIR/deploy_web.sh"
 chmod +x "$SCRIPT_DIR/deploy_web.sh"
 echo "✅ 生成 Web 部署脚本：$SCRIPT_DIR/deploy_web.sh"
 fi

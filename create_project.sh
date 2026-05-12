@@ -13,15 +13,18 @@ render_template() {
     local project_name
     local api_port
     local web_host_port
+    local base_dir
 
     project_name=$(escape_sed_replacement "$PROJECT_NAME")
     api_port=$(escape_sed_replacement "$API_PORT")
     web_host_port=$(escape_sed_replacement "$WEB_HOST_PORT")
+    base_dir=$(escape_sed_replacement "$BASE_DIR")
 
     sed \
         -e "s|\[\[PROJECT_NAME\]\]|$project_name|g" \
         -e "s|\[\[API_PORT\]\]|$api_port|g" \
         -e "s|\[\[WEB_HOST_PORT\]\]|$web_host_port|g" \
+        -e "s|\[\[BASE_DIR\]\]|$base_dir|g" \
         "$template_file" > "$output_file"
 }
 
@@ -94,8 +97,8 @@ if [[ $HAS_WEB -eq 1 ]]; then
 fi
 
 # 4. 定义目录结构
-BASE="/apps"
-PROJECT_DIR="$BASE/$PROJECT_NAME"
+BASE_DIR="${BASE_DIR:-/apps}"
+PROJECT_DIR="$BASE_DIR/$PROJECT_NAME"
 API_DIR="$PROJECT_DIR/api"
 WEB_DIR="$PROJECT_DIR/web"
 LOG_DIR="$PROJECT_DIR/logs"
